@@ -1,6 +1,6 @@
 import os
 from app import app, db, login_manager
-from flask import render_template, request, redirect, url_for, flash, session, abort
+from flask import render_template, request, redirect, url_for, flash, session, abort, send_from_directory
 from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
@@ -23,8 +23,26 @@ def about():
     """Render the website's about page."""
     return render_template('about.html', name="Mary Jane")
 
+
+@app.route("/uploads/<filename>")
 @login_required
+def get_image(filename):
+    """Return uploaded image file."""
+    return send_from_directory(os.path.join(os.getcwd(), app.config["UPLOAD_FOLDER"]), filename)
+
+
+
+@app.route("/files")
+@login_required
+def files():
+    """Displays a list of uploaded images in an HTML template."""
+    images = get_uploaded_images()
+    return render_template("files.html", images=images)
+
+
+
 @app.route('/upload', methods=['POST', 'GET'])
+@login_required
 def upload():
     form = UploadForm()
 
@@ -35,10 +53,9 @@ def upload():
         if form.validate_on_submit():
             file = form.file.data
             filename = secure_filename(file.filename) 
-            # Get file data and save to your uploads folder
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
             flash('Files Saved', 'success')
-            return redirect(url_for('home')) # Update this to redirect the user to a route that displays all uploaded image files
+            return redirect(url_for('files'))
 
     flash("Invalid file format. Only JPG and PNG are allowed.", "danger")
     return render_template('upload.html',form=form)
@@ -63,6 +80,25 @@ def login():
 @login_manager.user_loader
 def load_user(id):
     return db.session.execute(db.select(UserProfile).filter_by(id=id)).scalar()
+
+
+##HELPER FUNCTION##
+def get_uploaded_images():
+    """Retrieves a list of image filenames from the uploads folder."""
+    image_list = []
+    upload_folder = os.path.join(os.getcwd(), app.config["UPLOAD_FOLDER"])
+
+    if os.path.exists(upload_folder):
+        for file in os.listdir(upload_folder):
+            if file.lower().endswith(("jpg", "png")):
+                image_list.append(file)
+
+    return image_list
+
+
+
+
+
 
 ###
 # The functions below should be applicable to all Flask apps.
