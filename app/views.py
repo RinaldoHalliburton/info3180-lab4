@@ -5,7 +5,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
 from app.models import UserProfile
-from app.forms import LoginForm
+from app.forms import LoginForm, UploadForm
 
 
 ###
@@ -23,19 +23,25 @@ def about():
     """Render the website's about page."""
     return render_template('about.html', name="Mary Jane")
 
-
+@login_required
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
-    # Instantiate your form class
+    form = UploadForm()
 
+    if request.method == "GET":
+        return render_template("upload.html", form=form) 
     # Validate file upload on submit
-    if form.validate_on_submit():
-        # Get file data and save to your uploads folder
+    if request.method == "POST":
+        if form.validate_on_submit():
+            file = form.file.data
+            filename = secure_filename(file.filename) 
+            # Get file data and save to your uploads folder
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+            flash('Files Saved', 'success')
+            return redirect(url_for('home')) # Update this to redirect the user to a route that displays all uploaded image files
 
-        flash('File Saved', 'success')
-        return redirect(url_for('home')) # Update this to redirect the user to a route that displays all uploaded image files
-
-    return render_template('upload.html')
+    flash("Invalid file format. Only JPG and PNG are allowed.", "danger")
+    return render_template('upload.html',form=form)
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -46,7 +52,7 @@ def login():
         user = UserProfile.query.filter_by(username=form.username.data).first()
         if user and check_password_hash(user.password,form.password.data):
             login_user(user)
-            flash("Login Successful.")
+            flash("Login Successful.", 'success')
             return redirect(url_for("upload"))
         else:
             flash("Invalid username or password.")
